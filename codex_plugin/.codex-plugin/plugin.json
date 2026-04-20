@@ -1,0 +1,35 @@
+{
+  "name": "mnemo",
+  "version": "0.1.0",
+  "description": "Local-first memory for Codex using append-only events and sync-friendly views.",
+  "author": {
+    "name": "songkant",
+    "url": "https://openai.com/"
+  },
+  "license": "MIT",
+  "keywords": [
+    "memory",
+    "local-first",
+    "productivity",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks.json",
+  "interface": {
+    "displayName": "Mnemo",
+    "shortDescription": "Local memory for Codex",
+    "longDescription": "Query, capture, merge, review, and sync a local-first Mnemo memory vault from Codex.",
+    "developerName": "songkant",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Search my local Mnemo memory before answering.",
+      "Capture this session into Mnemo memory.",
+      "Check Mnemo sync health across devices."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

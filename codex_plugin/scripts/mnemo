@@ -1,0 +1,15 @@
+#!/bin/zsh
+set -e
+
+WORKTREE="__MNEMO_REPO_ROOT__"
+
+if [ -d "$WORKTREE/mnemo" ]; then
+  PYTHONPATH="$WORKTREE" exec python3 -m mnemo.cli "$@"
+fi
+
+if command -v mnemo >/dev/null 2>&1; then
+  exec mnemo "$@"
+fi
+
+echo "mnemo runtime not found. Expected workspace at $WORKTREE or an installed 'mnemo' command on PATH." >&2
+exit 1

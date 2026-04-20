@@ -1,0 +1,7 @@
+{
+  "name": "mnemo",
+  "description": "Local-first memory for coding agents with sync-friendly storage",
+  "author": {
+    "name": "OpenAI Codex"
+  }
+}

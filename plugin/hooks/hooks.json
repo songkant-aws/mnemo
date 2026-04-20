@@ -1,0 +1,29 @@
+{
+  "description": "Mnemo local memory hooks",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Grep|Glob|Read|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/mnemo-pretool",
+            "timeout": 3000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/mnemo-hook Stop",
+            "timeout": 4000
+          }
+        ]
+      }
+    ]
+  }
+}

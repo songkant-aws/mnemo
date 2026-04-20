@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Inject related Mnemo context before tool use."""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+from pathlib import Path
+
+
+CONFIG_PATH = Path(os.environ.get("MNEMO_CONFIG", str(Path.home() / ".mnemo" / "config.json")))
+DEFAULT_VAULT = Path.home() / ".mnemo" / "vault"
+STOP_TOKENS = {
+    "FILE", "PATH", "READ", "WRITE", "TEST", "BUILD", "CODE", "CLASS",
+    "IMPORT", "RETURN", "VALUE", "UPDATE", "CHECK", "SYSTEM",
+}
+
+
+def load_vault() -> Path:
+    try:
+        data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+        return Path(data.get("vault_dir", str(DEFAULT_VAULT))).expanduser().resolve()
+    except Exception:
+        return DEFAULT_VAULT
+
+
+def tokenise(value: str) -> list[str]:
+    raw = [part.upper() for part in re.split(r"[^A-Za-z0-9_]+", value) if len(part) >= 4]
+    return [token for token in raw if token not in STOP_TOKENS]
+
+
+def main() -> None:
+    materialized_path = load_vault() / "state" / "materialized.json"
+    if not materialized_path.exists():
+        return
+
+    try:
+        payload = json.load(sys.stdin)
+        materialized = json.loads(materialized_path.read_text(encoding="utf-8"))
+    except Exception:
+        return
+
+    tool_name = payload.get("tool_name", "")
+    tool_input = payload.get("tool_input", {})
+    raw = ""
+    if tool_name == "Read":
+        raw = tool_input.get("file_path", "")
+    elif tool_name == "Grep":
+        raw = tool_input.get("pattern", "")
+    elif tool_name == "Glob":
+        raw = tool_input.get("pattern", "")
+    elif tool_name == "Agent":
+        raw = tool_input.get("description", "")
+    if not raw:
+        return
+
+    tokens = tokenise(raw)
+    if not tokens:
+        return
+
+    matches = []
+    for name, entity in materialized.get("entities", {}).items():
+        haystack = " ".join([name, entity.get("summary", ""), " ".join(entity.get("aliases", []))]).upper()
+        score = sum(1 for token in tokens if token in haystack)
+        if score:
+            matches.append((score, name, entity))
+    matches.sort(key=lambda item: (-item[0], item[1]))
+
+    if not matches:
+        return
+
+    lines = ["mnemo: related local memory"]
+    for _, name, entity in matches[:3]:
+        related = materialized.get("adjacency", {}).get(name, [])[:4]
+        snippet = entity.get("summary", "")[:180]
+        suffix = f" [-> {', '.join(related)}]" if related else ""
+        lines.append(f"- {name} ({entity.get('entity_type', 'CONCEPT')}): {snippet}{suffix}")
+    print(json.dumps({"message": "\n".join(lines)}))
+
+
+if __name__ == "__main__":
+    main()
