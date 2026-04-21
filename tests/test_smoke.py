@@ -65,6 +65,14 @@ def main() -> None:
         found = query(materialized, "planner dedup")
         assert "PLANNER" in found["matched_entities"]
         assert found["relations"]
+        planner_note = local_paths.obsidian_entities / "PLANNER.md"
+        daily_note = local_paths.obsidian_daily / "2026-04-20.md"
+        home_note = local_paths.obsidian / "Home.md"
+        assert planner_note.exists()
+        assert daily_note.exists()
+        assert home_note.exists()
+        assert "[[entities/QUEUE_DEDUP|QUEUE_DEDUP]]" in planner_note.read_text(encoding="utf-8")
+        assert "[[entities/PLANNER|PLANNER]]" in daily_note.read_text(encoding="utf-8")
 
         queue_payload = {
             "captured_at": "2026-04-20T08:00:00Z",

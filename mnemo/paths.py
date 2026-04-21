@@ -12,6 +12,9 @@ class VaultPaths:
         self.views = root / "views"
         self.views_entities = self.views / "entities"
         self.views_daily = self.views / "daily"
+        self.obsidian = root / "obsidian"
+        self.obsidian_entities = self.obsidian / "entities"
+        self.obsidian_daily = self.obsidian / "daily"
         self.state = root / "state"
         self.queue = root / "queue"
         self.queue_processed = self.queue / "processed"
@@ -24,6 +27,9 @@ class VaultPaths:
             self.views,
             self.views_entities,
             self.views_daily,
+            self.obsidian,
+            self.obsidian_entities,
+            self.obsidian_daily,
             self.state,
             self.queue,
             self.queue_processed,

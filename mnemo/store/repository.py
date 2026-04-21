@@ -12,10 +12,21 @@ from mnemo.store.events import load_events, unique, write_json
 
 
 SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
+OBSIDIAN_NOTE_RE = re.compile(r'[\\/:#\^\[\]\|*?"<>]+')
 
 
 def slugify(value: str) -> str:
     return SAFE_NAME_RE.sub("-", value.strip()).strip("-").lower() or "unknown"
+
+
+def obsidian_note_name(value: str) -> str:
+    return OBSIDIAN_NOTE_RE.sub("_", value.strip()) or "unknown"
+
+
+def prune_markdown_dir(root, keep_names: set[str]) -> None:
+    for path in root.glob("*.md"):
+        if path.name not in keep_names:
+            path.unlink()
 
 
 def confidence_rank(value: str) -> int:
@@ -329,8 +340,11 @@ def export_views(paths: VaultPaths, state: MaterializedState) -> None:
         adjacency[relation.source].append(relation)
         adjacency[relation.target].append(relation)
 
+    keep_entity_views: set[str] = set()
     for entity in state.entities.values():
-        path = paths.views_entities / f"{slugify(entity.name)}.md"
+        filename = f"{slugify(entity.name)}.md"
+        keep_entity_views.add(filename)
+        path = paths.views_entities / filename
         lines = [
             "---",
             f'name: "{entity.name}"',
@@ -366,8 +380,11 @@ def export_views(paths: VaultPaths, state: MaterializedState) -> None:
     by_day: dict[str, list[dict]] = defaultdict(list)
     for session in state.sessions.values():
         by_day[session["date"]].append(session)
+    keep_daily_views: set[str] = set()
     for day, sessions in by_day.items():
-        path = paths.views_daily / f"{day}.md"
+        filename = f"{day}.md"
+        keep_daily_views.add(filename)
+        path = paths.views_daily / filename
         lines = ["---", f'date: "{day}"', f"sessions: {len(sessions)}", "---", "", f"# {day}", ""]
         for session in sorted(sessions, key=lambda item: item.get("recorded_at", "")):
             lines += [
@@ -386,6 +403,155 @@ def export_views(paths: VaultPaths, state: MaterializedState) -> None:
                 lines.extend(f"- {note}" for note in notes)
             lines.append("")
         path.write_text("\n".join(lines), encoding="utf-8")
+
+    prune_markdown_dir(paths.views_entities, keep_entity_views)
+    prune_markdown_dir(paths.views_daily, keep_daily_views)
+    export_obsidian(paths, state, adjacency, by_day)
+
+
+def export_obsidian(
+    paths: VaultPaths,
+    state: MaterializedState,
+    adjacency: dict[str, list[Relation]],
+    by_day: dict[str, list[dict]],
+) -> None:
+    keep_entity_notes: set[str] = set()
+    for entity in state.entities.values():
+        note_name = obsidian_note_name(entity.name)
+        filename = f"{note_name}.md"
+        keep_entity_notes.add(filename)
+        path = paths.obsidian_entities / filename
+        aliases = unique([entity.name] + entity.aliases)
+        lines = [
+            "---",
+            "aliases:",
+            *[f'  - "{alias}"' for alias in aliases],
+            "tags:",
+            '  - "mnemo/entity"',
+            f'  - "mnemo/type/{entity.entity_type.lower()}"',
+            f'entity_type: "{entity.entity_type}"',
+            f'confidence: "{entity.confidence}"',
+            f'first_seen: "{entity.first_seen}"',
+            f'last_seen: "{entity.last_seen}"',
+            f"session_count: {len(entity.session_ids)}",
+            "---",
+            "",
+            f"# {entity.name}",
+            "",
+            entity.summary or "_No summary yet._",
+            "",
+        ]
+        if entity.aliases:
+            lines += ["## Aliases", ""]
+            lines.extend(f"- {alias}" for alias in entity.aliases)
+            lines.append("")
+        if entity.urls:
+            lines += ["## References", ""]
+            lines.extend(f"- {url}" for url in entity.urls)
+            lines.append("")
+        if entity.paths:
+            lines += ["## Local Paths", ""]
+            lines.extend(f"- `{value}`" for value in entity.paths)
+            lines.append("")
+
+        related = sorted(adjacency.get(entity.name, []), key=lambda item: (-item.weight, item.target))
+        if related:
+            lines += ["## Relations", ""]
+            for relation in related:
+                other = relation.target if relation.source == entity.name else relation.source
+                other_note = obsidian_note_name(other)
+                summary = f" - {relation.summary}" if relation.summary else ""
+                lines.append(
+                    f"- `[{relation.relation_type}]` [[entities/{other_note}|{other}]]{summary}"
+                )
+            lines.append("")
+
+        if entity.session_ids:
+            lines += ["## Seen In Sessions", ""]
+            for session_id in entity.session_ids:
+                session = state.sessions.get(session_id)
+                if not session:
+                    lines.append(f"- `{session_id}`")
+                    continue
+                day = session.get("date", "")
+                if day:
+                    lines.append(f"- `{session_id}` in [[daily/{day}|{day}]]")
+                else:
+                    lines.append(f"- `{session_id}`")
+            lines.append("")
+
+        path.write_text("\n".join(lines), encoding="utf-8")
+
+    keep_daily_notes: set[str] = set()
+    for day, sessions in by_day.items():
+        filename = f"{day}.md"
+        keep_daily_notes.add(filename)
+        path = paths.obsidian_daily / filename
+        lines = [
+            "---",
+            f'date: "{day}"',
+            f"sessions: {len(sessions)}",
+            'tags:',
+            '  - "mnemo/daily"',
+            "---",
+            "",
+            f"# {day}",
+            "",
+        ]
+        for session in sorted(sessions, key=lambda item: item.get("recorded_at", "")):
+            lines += [
+                f"## {session['id']}",
+                "",
+                session.get("summary", "_No summary._") or "_No summary._",
+                "",
+                f"- source: `{session.get('source', '')}`",
+                f"- workspace: `{session.get('workspace', '')}`",
+                f"- device: `{session.get('device_id', '')}`",
+            ]
+            entities = session.get("entities", [])
+            if entities:
+                entity_links = ", ".join(
+                    f"[[entities/{obsidian_note_name(name)}|{name}]]" for name in entities
+                )
+                lines.append(f"- entities: {entity_links}")
+            else:
+                lines.append("- entities: none")
+            notes = session.get("notes", [])
+            if notes:
+                lines += ["", "### Notes", ""]
+                lines.extend(f"- {note}" for note in notes)
+            lines.append("")
+        path.write_text("\n".join(lines), encoding="utf-8")
+
+    home = paths.obsidian / "Home.md"
+    lines = [
+        "---",
+        'tags:',
+        '  - "mnemo/home"',
+        "---",
+        "",
+        "# Mnemo",
+        "",
+        "Open this folder as an Obsidian vault to explore the local memory graph.",
+        "",
+        "## Daily Notes",
+        "",
+    ]
+    if by_day:
+        for day in sorted(by_day, reverse=True):
+            lines.append(f"- [[daily/{day}|{day}]]")
+    else:
+        lines.append("- _No daily notes yet._")
+    lines += ["", "## Entities", ""]
+    if state.entities:
+        for entity in sorted(state.entities.values(), key=lambda item: item.name):
+            lines.append(f"- [[entities/{obsidian_note_name(entity.name)}|{entity.name}]]")
+    else:
+        lines.append("- _No entities yet._")
+    lines.append("")
+    home.write_text("\n".join(lines), encoding="utf-8")
+    prune_markdown_dir(paths.obsidian_entities, keep_entity_notes)
+    prune_markdown_dir(paths.obsidian_daily, keep_daily_notes)
 
 
 def load_materialized(paths: VaultPaths) -> dict:

@@ -23,6 +23,7 @@ Mnemo is built around one core idea:
      - relation index
      - adjacency map
      - Markdown views
+     - Obsidian-ready notes
      - duplicate-event report
      - feedback history
 
@@ -47,6 +48,7 @@ An append-only event log is much friendlier:
 - rebuilds are deterministic
 - conflicts are reduced to duplicate events, which are easier to detect
 - Markdown views can be regenerated
+- Obsidian graph notes can be regenerated too
 
 ## Queue flow
 

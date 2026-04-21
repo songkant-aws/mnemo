@@ -34,6 +34,12 @@ Use the local wrapper script:
 ~/plugins/mnemo/scripts/mnemo status
 ```
 
+### Rebuild graph-ready notes
+
+```bash
+~/plugins/mnemo/scripts/mnemo rebuild
+```
+
 ### Consume queued session breadcrumbs
 
 ```bash
@@ -64,5 +70,6 @@ Use the local wrapper script:
 
 - Query first when prior context may help.
 - Capture at the end of meaningful work.
+- Rebuild before opening Obsidian Graph View if recent changes are missing.
 - Prefer `sync health` before advising on cross-device sync issues.
 - Prefer merge and feedback events over hand-editing derived files.

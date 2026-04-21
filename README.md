@@ -3,7 +3,8 @@
 Local-first memory for coding agents.
 
 `mnemo` captures session knowledge as append-only events, rebuilds human-readable
-views, and keeps the canonical data layout friendly to cloud-synced folders.
+views, exports Obsidian-ready notes, and keeps the canonical data layout friendly
+to cloud-synced folders.
 
 ## Why this exists
 
@@ -27,6 +28,8 @@ Claude Code / agent
   -> rebuild projections
   -> views/entities/*.md
   -> views/daily/*.md
+  -> obsidian/entities/*.md
+  -> obsidian/daily/*.md
   -> state/materialized.json
 ```
 
@@ -54,6 +57,7 @@ Claude Code / agent
 └── vault/
     ├── events/              # canonical append-only source of truth
     ├── views/               # derived Markdown projections
+    ├── obsidian/            # Obsidian-ready notes for Graph View
     ├── state/               # rebuildable indexes and manifests
     ├── queue/               # local capture breadcrumbs
     └── sync/                # sync metadata
@@ -72,6 +76,26 @@ The canonical store is append-only JSONL segmented by date and device, so cloud
 merges are much less risky than a single mutable database file.
 
 More details: [docs/sync.md](docs/sync.md)
+
+## Obsidian Graph View
+
+After any `mnemo rebuild` or `mnemo capture`, Mnemo exports an Obsidian-friendly
+note set under `vault/obsidian/`.
+
+Open this folder as your Obsidian vault:
+
+```bash
+~/.mnemo/vault/obsidian
+```
+
+The export includes:
+
+- `entities/*.md` with wikilinks between related entities
+- `daily/*.md` with wikilinks back to entity notes
+- `Home.md` as a simple landing page
+
+That makes Obsidian Graph View usable without treating the raw event log or
+state files as notes.
 
 ## Claude Code plugin
 
